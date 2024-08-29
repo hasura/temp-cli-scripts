@@ -1,0 +1,140 @@
+diff --git a/boolean_expression_types/main.py b/boolean_expression_types/main.py
+index 69a851e..c8d99da 100644
+--- a/boolean_expression_types/main.py
++++ b/boolean_expression_types/main.py
+@@ -20,16 +20,27 @@
+ 
+ def read_all_hml_files(directory: str) -> Dict[str, str]:
+     hml_files = {}
+-    for root, _, files in os.walk(directory):
++    for root, dirs, files in os.walk(directory):
++        # Skip node_modules directories
++        if 'node_modules' in dirs:
++            dirs.remove('node_modules')
+         for filename in files:
+             if filename.endswith('.hml') or filename.endswith('.yaml') or filename.endswith('.yml'):
+                 file_path = os.path.join(root, filename)
+-                with open(file_path, 'r') as file:
+-                    hml_files[file_path] = file.read()
++                try:
++                    with open(file_path, 'r') as file:
++                        hml_files[file_path] = file.read()
++                except Exception as e:
++                    logger.warning(f"Error reading file {file_path}: {str(e)}")
+     return hml_files
+ 
+-def parse_hml_content(content: str) -> List[Dict[str, Any]]:
+-    return list(yaml.load_all(content))
++def parse_hml_content(content: str, filename: str) -> List[Dict[str, Any]]:
++    try:
++        return list(yaml.load_all(content))
++    except Exception as e:
++        # Provide more context in the error message
++        snippet = '\n'.join(content.split('\n')[:5])  # First 5 lines of the file
++        raise ValueError(f"Error parsing YAML in file {filename}:\n{str(e)}\nFile snippet:\n{snippet}")
+ 
+ def normalize_name(name: str) -> str:
+     # Remove any non-alphanumeric characters and convert to lowercase
+@@ -302,33 +313,49 @@ def main():
+ 
+     logger.info(f"Starting HML processing for project path: {args.project_path}")
+ 
+-    hml_files = read_all_hml_files(args.project_path)
+-    logger.info(f"Found {len(hml_files)} HML files")
++    try:
++        hml_files = read_all_hml_files(args.project_path)
++        logger.info(f"Found {len(hml_files)} HML files (excluding node_modules)")
+ 
+-    parsed_files = {filename: parse_hml_content(content) for filename, content in hml_files.items()}
+-    logger.info(f"Parsed {sum(len(docs) for docs in parsed_files.values())} documents from HML files")
+-    
+-    object_types, scalar_representations, data_connector_links, subgraph_name = extract_types(parsed_files)
+-    matched_object_types = match_object_types(object_types, data_connector_links)
+-    logger.info(f"Matched {len(matched_object_types)} ObjectTypes with DataConnectorLinks")
+-    
+-    new_boolean_expression_types = generate_boolean_expression_types(matched_object_types, scalar_representations, data_connector_links, subgraph_name)
+-    
+-    logger.info(f"Total HML files processed: {len(hml_files)}")
+-    logger.info(f"Total ObjectTypes: {len(object_types)}")
+-    logger.info(f"Total DataConnectorScalarRepresentations: {len(scalar_representations)}")
+-    logger.info(f"Total BooleanExpressionTypes generated: {len(new_boolean_expression_types)}")
+-
+-    # Process each HML file
+-    just_hml_files = {k: v for k, v in hml_files.items() if k.endswith('.hml')}
+-    for filename, content in just_hml_files.items():
+-        processed_content = process_hml_file(content, new_boolean_expression_types)
+-        with open(filename, 'w') as file:
+-            file.write(processed_content)
+-        logger.info(f"Processed and updated: {filename}")
+-
+-    write_new_hml_file(new_boolean_expression_types, args.output_file)
+-    logger.info(f"New BooleanExpressionTypes written to {args.output_file}")
++        parsed_files = {}
++        for filename, content in hml_files.items():
++            try:
++                parsed_files[filename] = parse_hml_content(content, filename)
++            except ValueError as e:
++                logger.error(str(e))
++                return
++
++        logger.info(f"Parsed {sum(len(docs) for docs in parsed_files.values())} documents from HML files")
++        
++        object_types, scalar_representations, data_connector_links, subgraph_name = extract_types(parsed_files)
++        matched_object_types = match_object_types(object_types, data_connector_links)
++        logger.info(f"Matched {len(matched_object_types)} ObjectTypes with DataConnectorLinks")
++        
++        new_boolean_expression_types = generate_boolean_expression_types(matched_object_types, scalar_representations, data_connector_links, subgraph_name)
++        
++        logger.info(f"Total HML files processed: {len(hml_files)}")
++        logger.info(f"Total ObjectTypes: {len(object_types)}")
++        logger.info(f"Total DataConnectorScalarRepresentations: {len(scalar_representations)}")
++        logger.info(f"Total BooleanExpressionTypes generated: {len(new_boolean_expression_types)}")
++
++        # Process each HML file
++        just_hml_files = {k: v for k, v in hml_files.items() if k.endswith('.hml')}
++        for filename, content in just_hml_files.items():
++            try:
++                processed_content = process_hml_file(content, new_boolean_expression_types)
++                with open(filename, 'w') as file:
++                    file.write(processed_content)
++                logger.info(f"Processed and updated: {filename}")
++            except Exception as e:
++                logger.error(f"Error processing file {filename}: {str(e)}")
++
++        write_new_hml_file(new_boolean_expression_types, args.output_file)
++        logger.info(f"New BooleanExpressionTypes written to {args.output_file}")
++
++    except Exception as e:
++        logger.error(f"An error occurred: {str(e)}")
++        import traceback
++        logger.debug(f"Stack trace: {traceback.format_exc()}")
+ 
+ if __name__ == "__main__":
+-    main()
++    main()
+\ No newline at end of file
+
+From bb8139b68d8043eb871582889e368019c21e5f1a Mon Sep 17 00:00:00 2001
+From: Sooraj Sanker <soorajshankar@gmail.com>
+Date: Mon, 29 Jul 2024 20:26:04 +0530
+Subject: [PATCH 3/3] skip generating nested array filtering
+
+---
+ boolean-expression-types/boolean_expression_types/main.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/boolean_expression_types/main.py b/boolean_expression_types/main.py
+index c8d99da..2370940 100644
+--- a/boolean_expression_types/main.py
++++ b/boolean_expression_types/main.py
+@@ -221,6 +221,10 @@ def generate_object_boolean_expression_type(object_name: str, object_info: Dict[
+         field_type = field['type']
+         capitalized_field_type = sanitize_name(capitalize_object_type_name(field_type))
+         
++        # Skip the iteration if field_type is an array type (nested array filtering is not supported)
++        if field_type.startswith('[') and field_type.endswith(']'):
++            continue
++    
+         # Check if the field type is a scalar type with a boolean expression
+         if field_type in scalar_bool_exps:
+             comparable_fields.append({

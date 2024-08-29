@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "aggregate-expression-types"
+version = "0.1.0"
+description = ""
+authors = ["Brandon Martin <brandon@codedmart.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "<3.13,>=3.8"
+ruamel-yaml = "^0.18.6"
+
+[tool.poetry.group.dev.dependencies]
+pyinstaller = "^6.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+aggregate-expression-types = "aggregate_expression_types.main:main"

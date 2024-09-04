@@ -81,7 +81,7 @@ def get_return_type(func: str, scalar_type: str, func_data: Dict[str, Any], scal
     Determine the correct return type for an aggregate function.
     """
     result_type = func_data['result_type'] or {}
-    name = result_type['name'] or ''
+    name = result_type['underlying_type']['name'] or ''
 
     if name in scalar_representations:
         return scalar_representations[name]
